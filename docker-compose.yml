@@ -1,0 +1,55 @@
+services:
+  backend:
+    build:
+      context: ./observer_backend
+    container_name: observer_backend
+    volumes:
+      - ./observer_backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mariadb
+      - neo4j
+    env_file:
+      - ./observer_backend/.env
+
+  frontend:
+    build:
+      context: ./observer_frontend
+    container_name: observer_frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observer_frontend:/app
+    depends_on:
+      - backend
+    env_file:
+      - ./observer_frontend/.env.local
+
+  mariadb:
+    image: mariadb:latest
+    container_name: observer_mariadb
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: observer_dashboard_database
+      MYSQL_USER: observer
+      MYSQL_PASSWORD: observer123
+    volumes:
+      - mariadb_data:/var/lib/mysql
+
+  neo4j:
+    image: neo4j:latest
+    container_name: observer_neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/observer
+    volumes:
+      - neo4j_data:/data
+
+volumes:
+  mariadb_data:
+  neo4j_data:

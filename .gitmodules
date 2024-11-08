@@ -1,0 +1,6 @@
+[submodule "observer_frontend"]
+	path = observer_frontend
+	url = git@github.com:kbjohnson-penn/observer_frontend.git
+[submodule "observer_backend"]
+	path = observer_backend
+	url = git@github.com:kbjohnson-penn/observer_backend.git
