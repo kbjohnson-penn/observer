@@ -3,15 +3,13 @@ services:
     build:
       context: ./observer_backend
     container_name: observer_backend
-    volumes:
-      - ./observer_backend:/app
     ports:
       - "8000:8000"
     depends_on:
       - mariadb
       - neo4j
-    env_file:
-      - ./observer_backend/.env
+    networks:
+      - observer_network
 
   frontend:
     build:
@@ -19,12 +17,10 @@ services:
     container_name: observer_frontend
     ports:
       - "3000:3000"
-    volumes:
-      - ./observer_frontend:/app
     depends_on:
       - backend
-    env_file:
-      - ./observer_frontend/.env.local
+    networks:
+      - observer_network
 
   mariadb:
     image: mariadb:latest
@@ -38,6 +34,8 @@ services:
       MYSQL_PASSWORD: observer123
     volumes:
       - mariadb_data:/var/lib/mysql
+    networks:
+      - observer_network
 
   neo4j:
     image: neo4j:latest
@@ -49,7 +47,13 @@ services:
       - NEO4J_AUTH=neo4j/observer
     volumes:
       - neo4j_data:/data
+    networks:
+      - observer_network
 
 volumes:
   mariadb_data:
   neo4j_data:
+
+
+networks:
+  observer_network:

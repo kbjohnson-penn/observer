@@ -1,0 +1,25 @@
+services:
+  backend:
+    build:
+      context: ./observer_backend
+    environment:
+      DJANGO_SETTINGS_MODULE: observer_backend.settings.production
+    command: gunicorn observer_backend.wsgi:application --bind 0.0.0.0:8000
+    env_file:
+      - ./observer_backend/env/prod.env
+
+  frontend:
+    build:
+      context: ./observer_frontend
+    environment:
+      NODE_ENV: production
+    command: npm start
+    env_file:
+      - ./observer_frontend/.env.local
+
+  mariadb:
+    environment:
+      MYSQL_ROOT_PASSWORD: productionpassword
+      MYSQL_DATABASE: observer_dashboard_database
+      MYSQL_USER: observer
+      MYSQL_PASSWORD: observer123

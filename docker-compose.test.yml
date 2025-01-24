@@ -1,0 +1,14 @@
+services:
+  backend:
+    command: pytest
+    env_file:
+      - ./observer_backend/env/test.env
+
+  frontend:
+    command: npm run test
+    env_file:
+      - ./observer_frontend/.env.local
+
+  mariadb:
+    environment:
+      MYSQL_DATABASE: test_database
