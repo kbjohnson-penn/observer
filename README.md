@@ -44,25 +44,40 @@ To run the entire project using Docker Compose, follow these steps:
    cd observer
    ```
 
-2. Build and start the Docker containers:
+2. Create the environment files:
 
    ```bash
-   docker-compose up --build -d
+   mkdir -p env
+   touch env/dev.env env/test.env env/prod.env
    ```
 
-3. Create a Django superuser: Open a new terminal and run the following command:
+3. Add the necessary environment variables to each file (`dev.env`, `test.env`, `prod.env`). Use `.env.example` as a reference.
+
+4. Build and start the Docker containers in development mode:
+
+   ```bash
+   docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+   ```
+
+   or
+
+   ```bash
+   ./docker_control.sh start dev
+   ```
+
+5. Create a Django superuser: Open a new terminal and run the following command:
 
    ```bash
    docker-compose exec backend python manage.py createsuperuser
    ```
 
-4. Access the services:
+6. Access the services:
 
    **Frontend**: Open your web browser and navigate to `http://localhost:3000`
 
    **Backend**: Open your web browser and navigate to `http://localhost:8000/admin` to access the Django admin interface
 
-5. Stopping the containers: To stop the running containers, use:
+7. Stopping the containers: To stop the running containers, use:
 
    ```bash
    docker-compose down
