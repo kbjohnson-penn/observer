@@ -1,14 +1,29 @@
 services:
   backend:
+    build:
+      context: ./observer_backend
     volumes:
       - ./observer_backend:/app
-    command: python manage.py runserver 0.0.0.0:8000
     env_file:
       - ./observer_backend/env/dev.env
+    depends_on:
+      - mariadb
+    networks:
+      - observer_network
+    ports:
+      - "8000:8000"
 
   frontend:
+    build:
+      context: ./observer_frontend
     volumes:
       - ./observer_frontend:/app
     command: npm run dev
     env_file:
       - ./observer_frontend/.env.local
+    depends_on:
+      - backend
+    networks:
+      - observer_network
+    ports:
+      - "3000:3000"
