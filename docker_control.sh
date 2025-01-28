@@ -41,9 +41,18 @@ start_docker_env() {
   echo "Docker environment started in $ENVIRONMENT mode."
 }
 
+# Function to restart the Docker environment
+restart_docker_env() {
+  echo "Restarting the Docker environment in $ENVIRONMENT mode..."
+  stop_docker_env
+  rebuild_docker_images
+  start_docker_env
+  echo "Docker environment restarted in $ENVIRONMENT mode."
+}
+
 # Function to show usage
 show_usage() {
-  echo "Usage: $0 {clean|stop|rebuild|start} [dev|test|prod]"
+  echo "Usage: $0 {clean|stop|rebuild|start|restart} [dev|test|prod]"
   exit 1
 }
 
@@ -94,6 +103,9 @@ case "$1" in
     ;;
   start)
     start_docker_env
+    ;;
+  restart)
+    restart_docker_env
     ;;
   *)
     show_usage
