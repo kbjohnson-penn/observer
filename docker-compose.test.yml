@@ -1,14 +1,22 @@
 services:
   backend:
-    command: pytest
+    container_name: test_observer_backend
     env_file:
       - ./observer_backend/env/test.env
+    command: sh -c "/wait-for-it.sh mariadb:3306 -- python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
 
   frontend:
-    command: npm run test
+    container_name: test_observer_frontend
     env_file:
       - ./observer_frontend/.env.local
+    command: sh -c "npm install && npm start"
 
   mariadb:
+    container_name: test_observer_mariadb
     environment:
-      MYSQL_DATABASE: test_database
+      MYSQL_DATABASE: test_observer_dashboard_database
+    volumes:
+      - test_mariadb_data:/var/lib/mysql
+
+volumes:
+  test_mariadb_data:

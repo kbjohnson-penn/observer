@@ -1,29 +1,26 @@
 services:
   backend:
-    build:
-      context: ./observer_backend
+    container_name: dev_observer_backend
     volumes:
       - ./observer_backend:/app
     env_file:
       - ./observer_backend/env/dev.env
-    depends_on:
-      - mariadb
-    networks:
-      - observer_network
-    ports:
-      - "8000:8000"
+    command: sh -c "/wait-for-it.sh mariadb:3306 -- python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
 
   frontend:
-    build:
-      context: ./observer_frontend
+    container_name: dev_observer_frontend
     volumes:
       - ./observer_frontend:/app
-    command: npm run dev
     env_file:
       - ./observer_frontend/.env.local
-    depends_on:
-      - backend
-    networks:
-      - observer_network
-    ports:
-      - "3000:3000"
+    command: sh -c "npm install && npm run dev"
+
+  mariadb:
+    container_name: dev_observer_mariadb
+    environment:
+      MYSQL_DATABASE: dev_observer_dashboard_database
+    volumes:
+      - dev_mariadb_data:/var/lib/mysql
+
+volumes:
+  dev_mariadb_data:

@@ -1,25 +1,16 @@
 services:
   backend:
-    build:
-      context: ./observer_backend
-    environment:
-      DJANGO_SETTINGS_MODULE: observer_backend.settings.production
-    command: gunicorn observer_backend.wsgi:application --bind 0.0.0.0:8000
+    container_name: prod_observer_backend
     env_file:
       - ./observer_backend/env/prod.env
+    restart: unless-stopped
 
   frontend:
-    build:
-      context: ./observer_frontend
-    environment:
-      NODE_ENV: production
-    command: npm start
+    container_name: prod_observer_frontend
     env_file:
       - ./observer_frontend/.env.local
+    restart: unless-stopped
 
   mariadb:
-    environment:
-      MYSQL_ROOT_PASSWORD: productionpassword
-      MYSQL_DATABASE: observer_dashboard_database
-      MYSQL_USER: observer
-      MYSQL_PASSWORD: observer123
+    container_name: prod_observer_mariadb
+    restart: unless-stopped
