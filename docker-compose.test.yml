@@ -3,7 +3,8 @@ services:
     container_name: test_observer_backend
     env_file:
       - ./observer_backend/env/test.env
-    command: sh -c "/wait-for-it.sh mariadb:3306 -- python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    # command: sh -c "/wait-for-it.sh mariadb:3306 -- python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    command: sh -c "/wait-for-it.sh mariadb:3306 -- python manage.py migrate && tail -f /dev/null"
 
   frontend:
     container_name: test_observer_frontend
