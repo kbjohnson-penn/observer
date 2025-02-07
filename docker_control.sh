@@ -6,13 +6,13 @@ clean_docker_env() {
   $DOCKER_COMPOSE down || { echo "Failed to stop and remove containers"; exit 1; }
 
   echo "Removing volumes..."
-  docker volume rm observer_mariadb_data observer_neo4j_data 2>/dev/null || echo "Some volumes were not found."
+  docker volume rm observer_dev_mariadb_data 2>/dev/null || echo "Some volumes were not found."
 
   echo "Pruning unused volumes..."
   docker volume prune -f || { echo "Failed to prune volumes"; exit 1; }
 
   echo "Removing Docker images for the project..."
-  docker rmi observer_backend observer_frontend mariadb:latest neo4j:latest 2>/dev/null || echo "Some images were not found or couldn't be removed."
+  docker rmi observer_backend observer_frontend mariadb:latest 2>/dev/null || echo "Some images were not found or couldn't be removed."
 
   echo "Pruning unused images..."
   docker image prune -f || { echo "Failed to prune images"; exit 1; }
