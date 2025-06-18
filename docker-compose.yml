@@ -6,7 +6,7 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - ./observer_backend/env/prod.env # Default is production
+      - ./env/prod.env # Default is production
     depends_on:
       mariadb:
         condition: service_healthy

@@ -50,9 +50,45 @@ restart_docker_env() {
   echo "Docker environment restarted in $ENVIRONMENT mode."
 }
 
+# Function to generate mock data
+generate_mock_data() {
+  echo "Generating mock data using environment variables from $ENVIRONMENT mode..."
+  
+  # Check if backend container is running
+  if ! docker-compose ps backend | grep -q "Up"; then
+    echo "Backend container is not running. Starting services first..."
+    start_docker_env
+    echo "Waiting for services to be ready..."
+    sleep 10
+  fi
+  
+  # Run migrations first
+  echo "Running database migrations..."
+  docker-compose exec backend python manage.py migrate || { echo "Failed to run migrations"; exit 1; }
+  
+  # Generate mock data using environment variables
+  echo "Generating mock data with environment settings..."
+  docker-compose exec backend python manage.py generate_mock_data || { echo "Failed to generate mock data"; exit 1; }
+  
+  echo "Mock data generation completed successfully!"
+}
+
 # Function to show usage
 show_usage() {
-  echo "Usage: $0 {clean|stop|rebuild|start|restart} [dev|test|prod]"
+  echo "Usage: $0 {clean|stop|rebuild|start|restart|mockdata} [dev|test|prod]"
+  echo "  clean    : Clean the Docker environment"
+  echo "  stop     : Stop the Docker environment"
+  echo "  rebuild  : Rebuild Docker images"
+  echo "  start    : Start the Docker environment"
+  echo "  restart  : Restart the Docker environment (stop, rebuild, start)"
+  echo "  mockdata : Generate mock data using environment variables"
+  echo "  Environment: dev (default), test, or prod"
+  echo ""
+  echo "Examples:"
+  echo "  $0 start dev"
+  echo "  $0 mockdata dev"
+  echo "  $0 rebuild"
+  echo "  $0 clean"
   exit 1
 }
 
@@ -106,6 +142,9 @@ case "$1" in
     ;;
   restart)
     restart_docker_env
+    ;;
+  mockdata)
+    generate_mock_data
     ;;
   *)
     show_usage

@@ -24,3 +24,6 @@
 *.pid
 *.pid.lock
 *.pidfile
+
+#environment files
+env/

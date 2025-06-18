@@ -4,7 +4,7 @@ services:
     volumes:
       - ./observer_backend:/app
     env_file:
-      - ./observer_backend/env/dev.env
+      - ./env/dev.env
     command: sh -c "/wait-for-it.sh mariadb:3306 -- python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
 
   frontend:
@@ -12,7 +12,7 @@ services:
     volumes:
       - ./observer_frontend:/app
     env_file:
-      - ./observer_frontend/.env.local
+      - ./env/dev.env
     command: sh -c "npm install && npm run dev"
 
   mariadb:

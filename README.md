@@ -1,145 +1,99 @@
 # Observer
 
-Observer is a comprehensive platform for collecting, analyzing, and visualizing medical encounter data with multimodal capabilities.
+Healthcare platform for collecting, analyzing, and visualizing medical encounter data with multimodal capabilities.
 
-## Project Overview
-
-This repository contains the `observer_frontend` and `observer_backend` projects as Git submodules:
-
-- **observer_frontend**: React/Next.js-based frontend application
-- **observer_backend**: Django REST API backend service
-
-## Table of Contents
-
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Cloning the Repository](#cloning-the-repository)
-  - [Environment Setup](#environment-setup)
-- [Running the Project](#running-the-project)
-  - [Development Mode](#development-mode)
-  - [Test Mode](#test-mode)
-  - [Production Mode](#production-mode)
-- [Project Structure](#project-structure)
-- [Development Workflow](#development-workflow)
-- [Testing](#testing)
-- [Contributing](#contributing)
-- [Deployment](#deployment)
-- [Troubleshooting](#troubleshooting)
-
-## Getting Started
-
-### Prerequisites
-
-- [Git](https://git-scm.com/) (2.13.0+)
-- [Docker](https://docs.docker.com/get-docker/) (20.10.0+)
-- [Docker Compose](https://docs.docker.com/compose/install/) (1.29.0+)
-
-### Cloning the Repository
-
-To clone this repository along with its submodules, use the following command:
+## Quick Start
 
 ```bash
 git clone --recurse-submodules git@github.com:kbjohnson-penn/observer.git
 cd observer
-```
-
-If you have already cloned the repository without submodules, you can initialize and update the submodules with:
-
-```bash
-git submodule update --init --recursive
-```
-
-### Environment Setup
-
-1. Create the environment files directory:
-
-```bash
-mkdir -p env
-touch env/dev.env env/test.env env/prod.env
-```
-
-2. Configure environment variables in each file. A minimal configuration example:
-
-```
-# Backend settings
-SECRET_KEY=your-secret-key
-DEBUG=True
-ALLOWED_HOSTS=localhost,127.0.0.1
-DATABASE_URL=postgres://postgres:postgres@db:5432/observer
-
-# Frontend settings
-NEXT_PUBLIC_API_URL=http://localhost:8000/api
-```
-
-Refer to individual submodule documentation for detailed environment variable requirements.
-
-## Running the Project
-
-The project uses Docker Compose for containerized deployment with different configurations for development, testing, and production environments.
-
-### Development Mode
-
-```bash
 ./docker_control.sh start dev
+./docker_control.sh mockdata dev
 ```
 
-Or manually:
+**Access:** Frontend: http://localhost:3000 | API: http://localhost:8000/api | Admin: http://localhost:8000/admin
+
+## Architecture
+
+- **Frontend**: Next.js 14 + TypeScript (see `observer_frontend/README.md`)
+- **Backend**: Django 5.0.1 + DRF + JWT Auth (see `observer_backend/README.md`)
+- **Database**: MariaDB
+- **Storage**: Azure Storage
+
+## Prerequisites
+
+- Docker & Docker Compose
+
+## Environment Configuration
+
+Pre-configured files in `/env/`:
+- `dev.env` - Development with full mock data
+- `test.env` - Testing with smaller datasets
+- `prod.env` - Production (requires Azure credentials)
+
+### Key Variables
 
 ```bash
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+# Backend Settings
+SECRET_KEY=RR%732E$FKYgkQ*4GtyV77PJxusGY%a-dev
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1,backend
+CSRF_TRUSTED_ORIGINS=http://localhost,http://127.0.0.1
+
+# Database Settings
+DB_HOST=mariadb
+DB_NAME=dev_observer_dashboard_database
+DB_USER=observer
+DB_PASSWORD=observer123
+DB_PORT=3306
+TEST_DB=test_dev_observer_dashboard_database
+
+# Azure Storage Settings
+AZURE_STORAGE_ACCOUNT_NAME=
+AZURE_STORAGE_FILE_SYSTEM_NAME=
+AZURE_SAS_TOKEN=
+
+# Django Settings
+DOCUMENTATION_URL=http://localhost:8000/docs
+LOG_FILE=dev.observer.log
+
+# Frontend Settings
+NEXT_PUBLIC_BACKEND_API=http://backend:8000/api/v1
+
+# Mock Data Generation Settings
+MOCK_DATA_SEED=42
+MOCK_DATA_CLINIC_PATIENTS=200
+MOCK_DATA_CLINIC_PROVIDERS=200
+MOCK_DATA_SIMCENTER_PATIENTS=50
+MOCK_DATA_SIMCENTER_PROVIDERS=30
+MOCK_DATA_CLINIC_ENCOUNTERS=150
+MOCK_DATA_SIMCENTER_ENCOUNTERS=50
+MOCK_DATA_CLEAR_EXISTING=True
 ```
 
-This starts:
+**Production Setup:** Update `env/prod.env` with secure `SECRET_KEY`, set `DEBUG=False`, add Azure credentials, remove `MOCK_DATA_*` variables.
 
-- Frontend service at http://localhost:3000
-- Backend service at http://localhost:8000
-- PostgreSQL database
-- Redis cache
-
-### Test Mode
+## Docker Commands
 
 ```bash
-./docker_control.sh start test
+./docker_control.sh start dev|test|prod    # Start environment
+./docker_control.sh mockdata dev|test      # Generate sample data
+./docker_control.sh stop                   # Stop all services
+./docker_control.sh clean                  # Remove containers/volumes
+./docker_control.sh rebuild                # Rebuild images
 ```
 
-Or manually:
+### Manual Setup
 
 ```bash
-docker-compose -f docker-compose.yml -f docker-compose.test.yml up --build -d
-```
-
-### Production Mode
-
-```bash
-./docker_control.sh start prod
-```
-
-Or manually:
-
-```bash
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
-```
-
-### Initial Setup
-
-After starting services for the first time:
-
-1. Create a Django superuser:
-
-```bash
-docker-compose exec backend python manage.py createsuperuser
-```
-
-2. Run database migrations:
-
-```bash
+# Run migrations
 docker-compose exec backend python manage.py migrate
-```
 
-3. Generate test data (optional):
+# Create admin user
+docker-compose exec backend python manage.py createsuperuser
 
-```bash
-docker-compose exec backend python manage.py generate_mock_data
+# Custom mock data
+docker-compose exec backend python manage.py generate_mock_data --clinic-patients 100
 ```
 
 ## Project Structure
@@ -151,8 +105,21 @@ observer/
 ├── docker-compose.test.yml         # Testing overrides
 ├── docker-compose.prod.yml         # Production overrides
 ├── docker_control.sh               # Convenience script for Docker operations
-├── observer_backend/               # Backend submodule
-└── observer_frontend/              # Frontend submodule
+├── env/                           # Environment files directory
+│   ├── dev.env                    # Development environment
+│   ├── test.env                   # Testing environment
+│   └── prod.env                   # Production environment
+├── observer_backend/               # Backend submodule (Django)
+│   ├── dashboard/                 # Main Django application
+│   ├── backend/                   # Django settings
+│   └── manage.py
+└── observer_frontend/              # Frontend submodule (Next.js)
+    ├── src/
+    │   ├── app/                   # Next.js pages and layouts
+    │   ├── components/            # Reusable components
+    │   ├── contexts/             # React contexts (AuthContext)
+    │   └── lib/                  # API client and utilities
+    └── package.json
 ```
 
 ## Development Workflow
@@ -178,50 +145,69 @@ git commit -m "chore: update submodule pointer"
 
 ### Working with Docker
 
-Stop all services:
-
 ```bash
+# Stop all services
 ./docker_control.sh stop
-```
 
-View logs:
+# Clean everything (containers, volumes, images)
+./docker_control.sh clean
 
-```bash
+# Rebuild images
+./docker_control.sh rebuild
+
+# Restart services
+./docker_control.sh restart dev
+
+# Generate mock data
+./docker_control.sh mockdata dev    # or test
+
+# View logs
 docker-compose logs -f
-```
+docker-compose logs -f backend
 
-Access container shells:
-
-```bash
+# Access container shells
 docker-compose exec frontend sh
 docker-compose exec backend bash
+docker-compose exec mariadb mysql -u root -p
 ```
 
 ## Testing
 
-### Backend Tests
-
 ```bash
+# Backend tests
 docker-compose exec backend python manage.py test
-```
 
-### Frontend Tests
-
-```bash
+# Frontend tests
 docker-compose exec frontend npm test
 ```
 
+## Production Deployment
+
+1. Update `env/prod.env` with secure values
+2. Run `./docker_control.sh start prod`
+3. Configure reverse proxy for TLS
+
 ## Contributing
 
-Please refer to the `CONTRIBUTING.md` files in each submodule for detailed contribution guidelines.
+1. Work in feature branches within the respective submodules
+2. Update submodule pointers in the main repository after changes
+3. Follow existing code patterns and conventions
+4. Ensure tests pass before committing
+5. Use conventional commit messages
 
-## Deployment
+For detailed contributing guidelines, see the CONTRIBUTING.md files in each submodule.
 
-For production deployment, ensure:
+## Documentation
 
-1. Set secure environment variables in `env/prod.env`
-2. Use production Docker Compose configuration: `docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
-3. Configure reverse proxy (Nginx, Traefik) for TLS termination
+- **API Documentation**: See `observer_backend/README.md`
+- **Frontend Components**: See `observer_frontend/README.md`
+- **Development Context**: See `CLAUDE.md`
+
+## Changelog
+
+For version details and update history, see [CHANGELOG.md](CHANGELOG.md).
+4. Set up proper backup procedures for MariaDB
+5. Monitor logs and performance
 
 ## Troubleshooting
 
@@ -240,9 +226,13 @@ For production deployment, ensure:
    docker network inspect observer_default
    ```
 
-3. **Database Connection Issues**: Verify PostgreSQL is running and credentials are correct:
+3. **Database Connection Issues**: Verify MariaDB is running and credentials are correct:
    ```bash
-   docker-compose exec db psql -U postgres
+   docker-compose exec mariadb mysql -u observer -p
    ```
+
+4. **Environment Variable Issues**: All environment variables are in `/env/` directory, not in submodules
+
+5. **Authentication Issues**: Login at http://localhost:3000/login - authentication is enabled by default
 
 For more information, check the documentation and README files in each submodule.

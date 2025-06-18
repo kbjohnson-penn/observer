@@ -2,13 +2,13 @@ services:
   backend:
     container_name: prod_observer_backend
     env_file:
-      - ./observer_backend/env/prod.env
+      - ./env/prod.env
     restart: unless-stopped
 
   frontend:
     container_name: prod_observer_frontend
     env_file:
-      - ./observer_frontend/.env.local
+      - ./env/prod.env
     restart: unless-stopped
 
   mariadb:
