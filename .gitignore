@@ -27,3 +27,6 @@
 
 #environment files
 env/
+
+# Data
+data/
