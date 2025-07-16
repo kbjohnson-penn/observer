@@ -14,17 +14,17 @@ services:
       - observer_network
     command: sh -c "/wait-for-it.sh mariadb:3306 -- python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
 
-  frontend:
-    build:
-      context: ./observer_frontend
-    container_name: prod_observer_frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-    networks:
-      - observer_network
-    command: sh -c "npm install && npm start"
+  # frontend:
+  #   build:
+  #     context: ./observer_frontend
+  #   container_name: prod_observer_frontend
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - observer_network
+  #   command: sh -c "npm install && npm start"
 
   mariadb:
     image: mariadb:latest
