@@ -33,3 +33,9 @@ data/
 
 #AI
 .claude/
+
+# Pictures
+*.png
+*.jpg
+*.jpeg
+*.gif
