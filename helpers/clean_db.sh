@@ -15,8 +15,8 @@ NC='\033[0m' # No Color
 MYSQL_ROOT_USER="root"
 MYSQL_OBSERVER_USER="observer"
 MYSQL_OBSERVER_PASSWORD="observer_password"  # Update this with your actual password
-PYTHON_PATH="/path/to/env" # Update this with your environment path
-PROJECT_DIR="/path/to/backend" # Update this with your actual project directory
+PYTHON_PATH="/Users/mopidevi/miniconda3/envs/observer/bin/python" # Update this with your environment path
+PROJECT_DIR="/Users/mopidevi/Workspace/projects/observer/observer_backend/" # Update this with your actual project directory
 
 echo -e "${GREEN}Starting Observer Database and User Reset...${NC}"
 
