@@ -4,122 +4,90 @@ Healthcare platform for collecting, analyzing, and visualizing medical encounter
 
 ## Quick Start
 
+### Docker Development (Recommended)
+
 ```bash
 git clone --recurse-submodules git@github.com:kbjohnson-penn/observer.git
 cd observer
-./docker_control.sh start dev
-./docker_control.sh mockdata dev
+
+# Start all services
+docker-compose up --build
+
 ```
 
-**Access:** Frontend: http://localhost:3000 | API: http://localhost:8000/api | Admin: http://localhost:8000/admin
+### Local Development
+
+```bash
+# Set up databases
+./helpers/clean_db.sh
+
+# Run backend locally
+cd observer_backend
+pip install -r requirements.txt
+python manage.py runserver
+
+# Run frontend locally  
+cd observer_frontend
+npm install
+npm run dev
+```
+
+**Access:** Backend API: http://localhost:8000/api | Admin: http://localhost:8000/admin | Frontend: http://localhost:3000
+
+**Note for development:** While Docker is excellent for production deployments, consider using local development (npm run dev) instead of Docker during development on Mac and Windows for better performance. Learn more about optimizing local development.
 
 ## Architecture
 
-- **Frontend**: Next.js 14 + TypeScript (see `observer_frontend/README.md`)
+- **Frontend**: Next.js 15 + TypeScript (see `observer_frontend/README.md`)
 - **Backend**: Django 5.0.1 + DRF + JWT Auth (see `observer_backend/README.md`)
-- **Database**: MariaDB
+- **Database**: Multi-database MariaDB setup (accounts, clinical, research)
 - **Storage**: Azure Storage
+- **Containerization**: Docker Compose with volume mounts for development
 
 ## Prerequisites
 
 - Docker & Docker Compose
+- For local development: Python 3.10+, Node.js 18+, MariaDB
 
-## Environment Configuration
+## Docker Configuration
 
-Pre-configured files in `/env/`:
-- `dev.env` - Development with full mock data
-- `test.env` - Testing with smaller datasets
-- `prod.env` - Production (requires Azure credentials)
+The Docker setup uses a single `docker-compose.yml` with three MariaDB containers:
 
-### Key Variables
+- **accounts_db**: Port 3306 → `observer_accounts` database
+- **clinical_db**: Port 3307 → `observer_clinical` database  
+- **research_db**: Port 3308 → `observer_research` database
 
-```bash
-# Backend Settings
-SECRET_KEY=RR%732E$FKYgkQ*4GtyV77PJxusGY%a-dev
-DEBUG=True
-ALLOWED_HOSTS=localhost,127.0.0.1,backend
-CSRF_TRUSTED_ORIGINS=http://localhost,http://127.0.0.1
-
-# Database Settings
-DB_HOST=mariadb
-DB_NAME=dev_observer_dashboard_database
-DB_USER=observer
-DB_PASSWORD=observer123
-DB_PORT=3306
-TEST_DB=test_dev_observer_dashboard_database
-
-# Azure Storage Settings
-AZURE_STORAGE_ACCOUNT_NAME=
-AZURE_STORAGE_FILE_SYSTEM_NAME=
-AZURE_SAS_TOKEN=
-
-# Django Settings
-DOCUMENTATION_URL=http://localhost:8000/docs
-LOG_FILE=dev.observer.log
-
-# Frontend Settings
-NEXT_PUBLIC_BACKEND_API=http://backend:8000/api/v1
-
-# Mock Data Generation Settings
-MOCK_DATA_SEED=42
-MOCK_DATA_CLINIC_PATIENTS=200
-MOCK_DATA_CLINIC_PROVIDERS=200
-MOCK_DATA_SIMCENTER_PATIENTS=50
-MOCK_DATA_SIMCENTER_PROVIDERS=30
-MOCK_DATA_CLINIC_ENCOUNTERS=150
-MOCK_DATA_SIMCENTER_ENCOUNTERS=50
-MOCK_DATA_CLEAR_EXISTING=True
-```
-
-**Production Setup:** Update `env/prod.env` with secure `SECRET_KEY`, set `DEBUG=False`, add Azure credentials, remove `MOCK_DATA_*` variables.
+Environment variables are configured in `observer_backend/.env`.
 
 ## Docker Commands
 
 ```bash
-./docker_control.sh start dev|test|prod    # Start environment
-./docker_control.sh mockdata dev|test      # Generate sample data
-./docker_control.sh stop                   # Stop all services
-./docker_control.sh clean                  # Remove containers/volumes
-./docker_control.sh rebuild                # Rebuild images
+# Start all services
+docker-compose up --build
+
+# Start in background
+docker-compose up -d --build
+
+# Stop services
+docker-compose down
+
+# Clean everything (containers, volumes)
+docker-compose down -v --remove-orphans
+
+# View logs
+docker-compose logs -f
+docker-compose logs -f backend
+
+# Access containers
+docker-compose exec backend bash
+docker-compose exec accounts_db mysql -u observer -pobserver_password observer_accounts
 ```
 
-### Manual Setup
+### Manual Operations
 
 ```bash
-# Run migrations
-docker-compose exec backend python manage.py migrate
-
 # Create admin user
-docker-compose exec backend python manage.py createsuperuser
-
-# Custom mock data
-docker-compose exec backend python manage.py generate_mock_data --clinic-patients 100
-```
-
-## Project Structure
-
-```
-observer/
-├── docker-compose.yml              # Base Docker Compose configuration
-├── docker-compose.dev.yml          # Development overrides
-├── docker-compose.test.yml         # Testing overrides
-├── docker-compose.prod.yml         # Production overrides
-├── docker_control.sh               # Convenience script for Docker operations
-├── env/                           # Environment files directory
-│   ├── dev.env                    # Development environment
-│   ├── test.env                   # Testing environment
-│   └── prod.env                   # Production environment
-├── observer_backend/               # Backend submodule (Django)
-│   ├── dashboard/                 # Main Django application
-│   ├── backend/                   # Django settings
-│   └── manage.py
-└── observer_frontend/              # Frontend submodule (Next.js)
-    ├── src/
-    │   ├── app/                   # Next.js pages and layouts
-    │   ├── components/            # Reusable components
-    │   ├── contexts/             # React contexts (AuthContext)
-    │   └── lib/                  # API client and utilities
-    └── package.json
+docker-compose exec backend python manage.py createsuperuser --database=accounts
 ```
 
 ## Development Workflow
@@ -197,42 +165,8 @@ docker-compose exec frontend npm test
 
 For detailed contributing guidelines, see the CONTRIBUTING.md files in each submodule.
 
-## Documentation
-
-- **API Documentation**: See `observer_backend/README.md`
-- **Frontend Components**: See `observer_frontend/README.md`
-- **Development Context**: See `CLAUDE.md`
-
 ## Changelog
 
 For version details and update history, see [CHANGELOG.md](CHANGELOG.md).
 4. Set up proper backup procedures for MariaDB
 5. Monitor logs and performance
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Submodule Updates**: If submodules are not updating correctly, try:
-
-   ```bash
-   git submodule update --init --recursive --force
-   ```
-
-2. **Docker Network Issues**: If services can't communicate, check network configuration:
-
-   ```bash
-   docker network ls
-   docker network inspect observer_default
-   ```
-
-3. **Database Connection Issues**: Verify MariaDB is running and credentials are correct:
-   ```bash
-   docker-compose exec mariadb mysql -u observer -p
-   ```
-
-4. **Environment Variable Issues**: All environment variables are in `/env/` directory, not in submodules
-
-5. **Authentication Issues**: Login at http://localhost:3000/login - authentication is enabled by default
-
-For more information, check the documentation and README files in each submodule.

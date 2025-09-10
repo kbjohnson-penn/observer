@@ -2,42 +2,78 @@ services:
   backend:
     build:
       context: ./observer_backend
-    container_name: prod_observer_backend
+    container_name: observer_backend
     ports:
       - "8000:8000"
+    volumes:
+      - ./observer_backend:/app
     env_file:
-      - ./env/prod.env # Default is production
+      - ./observer_backend/.env
     depends_on:
-      mariadb:
+      accounts_db:
+        condition: service_healthy
+      clinical_db:
+        condition: service_healthy
+      research_db:
         condition: service_healthy
     networks:
       - observer_network
-    command: sh -c "/wait-for-it.sh mariadb:3306 -- python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    command: sh -c "/wait-for-it.sh accounts_db:3306 -- /wait-for-it.sh clinical_db:3306 -- /wait-for-it.sh research_db:3306 -- python manage.py migrate --database=accounts && python manage.py migrate --database=clinical && python manage.py migrate --database=research && python manage.py runserver 0.0.0.0:8000"
 
-  # frontend:
-  #   build:
-  #     context: ./observer_frontend
-  #   container_name: prod_observer_frontend
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - backend
-  #   networks:
-  #     - observer_network
-  #   command: sh -c "npm install && npm start"
-
-  mariadb:
+  accounts_db:
     image: mariadb:latest
-    container_name: prod_observer_mariadb
+    container_name: observer_accounts_db
     ports:
       - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: prod_observer_dashboard_database
+      MYSQL_DATABASE: observer_accounts
       MYSQL_USER: observer
-      MYSQL_PASSWORD: observer123
+      MYSQL_PASSWORD: observer_password
     volumes:
-      - prod_mariadb_data:/var/lib/mysql
+      - accounts_data:/var/lib/mysql
+    networks:
+      - observer_network
+    healthcheck:
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  clinical_db:
+    image: mariadb:latest
+    container_name: observer_clinical_db
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: observer_clinical
+      MYSQL_USER: observer
+      MYSQL_PASSWORD: observer_password
+    volumes:
+      - clinical_data:/var/lib/mysql
+    networks:
+      - observer_network
+    healthcheck:
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  research_db:
+    image: mariadb:latest
+    container_name: observer_research_db
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: observer_research
+      MYSQL_USER: observer
+      MYSQL_PASSWORD: observer_password
+    volumes:
+      - research_data:/var/lib/mysql
     networks:
       - observer_network
     healthcheck:
@@ -48,8 +84,9 @@ services:
       retries: 3
 
 volumes:
-  prod_mariadb_data:
-
+  accounts_data:
+  clinical_data:
+  research_data:
 
 networks:
   observer_network:
