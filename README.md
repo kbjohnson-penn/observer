@@ -111,50 +111,6 @@ git add observer_frontend  # or observer_backend
 git commit -m "chore: update submodule pointer"
 ```
 
-### Working with Docker
-
-```bash
-# Stop all services
-./docker_control.sh stop
-
-# Clean everything (containers, volumes, images)
-./docker_control.sh clean
-
-# Rebuild images
-./docker_control.sh rebuild
-
-# Restart services
-./docker_control.sh restart dev
-
-# Generate mock data
-./docker_control.sh mockdata dev    # or test
-
-# View logs
-docker-compose logs -f
-docker-compose logs -f backend
-
-# Access container shells
-docker-compose exec frontend sh
-docker-compose exec backend bash
-docker-compose exec mariadb mysql -u root -p
-```
-
-## Testing
-
-```bash
-# Backend tests
-docker-compose exec backend python manage.py test
-
-# Frontend tests
-docker-compose exec frontend npm test
-```
-
-## Production Deployment
-
-1. Update `env/prod.env` with secure values
-2. Run `./docker_control.sh start prod`
-3. Configure reverse proxy for TLS
-
 ## Contributing
 
 1. Work in feature branches within the respective submodules
