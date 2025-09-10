@@ -10,12 +10,22 @@ Healthcare platform for collecting, analyzing, and visualizing medical encounter
 git clone --recurse-submodules git@github.com:kbjohnson-penn/observer.git
 cd observer
 
+# Copy observer_backend/.env.docker to observer_backend/.env
+cp observer_backend/.env.docker observer_backend/.env
+
 # Start all services
 docker-compose up --build
-
 ```
 
 ### Local Development
+
+- Update paths in `helpers/clean_db.sh`
+
+`ENV_FILE="/path/to/observer/observer_backend/.env"`
+`PYTHON_PATH="/path/to/miniconda3/envs/observer/bin/python"`
+`PROJECT_DIR="/path/to/Workspace/projects/observer/observer_backend/"`
+
+- Then run the following
 
 ```bash
 # Set up databases
