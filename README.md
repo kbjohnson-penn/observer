@@ -30,7 +30,7 @@ Backend must be accessed via: `http://localhost:8000`
 
 #### Setup Steps
 
-1. Update paths in `helpers/clean_db.sh`
+1. Update paths in `scripts/clean_db.sh`
 
 ```bash
 ENV_FILE="/path/to/observer/observer_backend/.env"
@@ -54,7 +54,10 @@ INTERNAL_BACKEND_API=http://localhost:8000/api/v1
 
 ```bash
 # Set up databases
-./helpers/clean_db.sh
+./scripts/clean_db.sh
+
+# Import SQL data (optional - if you have data dumps)
+./scripts/import_data.sh
 
 # Run backend locally
 cd observer_backend
