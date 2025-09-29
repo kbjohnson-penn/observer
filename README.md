@@ -19,13 +19,38 @@ docker-compose up --build
 
 ### Local Development
 
-- Update paths in `helpers/clean_db.sh`
+#### ⚠️ CRITICAL: Domain Configuration
 
-`ENV_FILE="/path/to/observer/observer_backend/.env"`
-`PYTHON_PATH="/path/to/miniconda3/envs/observer/bin/python"`
-`PROJECT_DIR="/path/to/Workspace/projects/observer/observer_backend/"`
+**Authentication requires consistent domain usage between frontend and backend.**
 
-- Then run the following
+Frontend runs on: `http://localhost:3000`
+Backend must be accessed via: `http://localhost:8000`
+
+**DO NOT MIX `localhost` and `127.0.0.1`** - they are treated as different domains by browsers, which will break httpOnly cookie authentication.
+
+#### Setup Steps
+
+1. Update paths in `helpers/clean_db.sh`
+
+```bash
+ENV_FILE="/path/to/observer/observer_backend/.env"
+PYTHON_PATH="/path/to/miniconda3/envs/observer/bin/python"
+PROJECT_DIR="/path/to/Workspace/projects/observer/observer_backend/"
+```
+
+2. **Configure frontend environment variables**
+
+Copy and verify `observer_frontend/.env.local`:
+```bash
+# ✅ CORRECT - use localhost consistently
+NEXT_PUBLIC_BACKEND_API=http://localhost:8000/api/v1
+INTERNAL_BACKEND_API=http://localhost:8000/api/v1
+
+# ❌ WRONG - will break authentication
+# NEXT_PUBLIC_BACKEND_API=http://127.0.0.1:8000/api/v1
+```
+
+3. Run the services
 
 ```bash
 # Set up databases
@@ -34,17 +59,29 @@ docker-compose up --build
 # Run backend locally
 cd observer_backend
 pip install -r requirements.txt
-python manage.py runserver
+python manage.py runserver 0.0.0.0:8000
 
-# Run frontend locally  
+# Run frontend locally
 cd observer_frontend
 npm install
 npm run dev
 ```
 
-**Access:** Backend API: http://localhost:8000/api | Admin: http://localhost:8000/admin | Frontend: http://localhost:3000
+**Access:**
+- Backend API: http://localhost:8000/api
+- Admin: http://localhost:8000/admin
+- Frontend: http://localhost:3000
 
-**Note for development:** While Docker is excellent for production deployments, consider using local development (npm run dev) instead of Docker during development on Mac and Windows for better performance. Learn more about optimizing local development.
+#### Authentication Troubleshooting
+
+If login redirects to login page (redirect loop):
+
+1. **Check domain consistency** in `.env.local` files
+2. **Clear browser cookies** for both localhost:3000 and 127.0.0.1:8000
+3. **Verify backend CORS settings** include `http://localhost:3000`
+4. **Check browser Network tab** for `Set-Cookie` headers in login response
+
+**Note for development:** While Docker is excellent for production deployments, consider using local development (npm run dev) instead of Docker during development on Mac and Windows for better performance.
 
 ## Architecture
 
