@@ -66,7 +66,7 @@ python manage.py runserver 0.0.0.0:8000
 
 # Run frontend locally
 cd observer_frontend
-npm install
+npm install --legacy-peer-deps
 npm run dev
 ```
 
