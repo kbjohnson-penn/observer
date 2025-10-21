@@ -1,8 +1,56 @@
 # macOS
 .DS_Store
+Thumbs.db
 
-# Logs
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+*.egg
+*.egg-info/
+dist/
+build/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+coverage/
+.tox/
+*.cover
+.hypothesis/
+
+# Django
 *.log
+db.sqlite3
+media/
+staticfiles/
+static/
+local_settings.py
+
+# Node
+node_modules/
+.next/
+out/
+.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+.env.*
 
 # Temporary files
 *.tmp
@@ -19,23 +67,22 @@
 *.sublime-workspace
 *.iml
 
-
 # PIDs
 *.pid
 *.pid.lock
 *.pidfile
 
-#environment files
-env/
-
 # Data
 data/
+*.sql
+*.dump
+*.sqlite
 
-#AI
+# AI
 .claude/
 
-# Pictures
-*.png
-*.jpg
-*.jpeg
-*.gif
+# Pictures (commented out - you may want images in git)
+# *.png
+# *.jpg
+# *.jpeg
+# *.gif
