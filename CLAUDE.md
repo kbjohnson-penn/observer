@@ -29,6 +29,7 @@ The backend uses **httpOnly cookie-based JWT authentication** for security:
 - **Cookie settings**: httpOnly, secure (production), SameSite=None (cross-subdomain)
 - **CSRF protection**: Required for all state-changing endpoints
 - **Rate limiting**: Configurable via `.env` files (e.g., `RATE_LIMIT_LOGIN=5/m`)
+- **Audit logging**: Login/logout and major events are logged with IP and user agent
 
 ### Auth Endpoints
 
@@ -112,4 +113,4 @@ The backend uses Django's multi-database routing:
 - `clinical` app → `observer_clinical` database
 - `research` app → `observer_research` database
 
-Always specify `using='db_name'` for cross-database queries.
+Always specify `using='db_name'` for cross-database queries. And you cannot perform joins across different databases or use foreign keys spanning databases.
