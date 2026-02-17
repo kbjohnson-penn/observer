@@ -4,7 +4,9 @@ Healthcare platform for collecting, analyzing, and visualizing medical encounter
 
 ## Quick Start
 
-### Docker Development (Recommended)
+### Container Development (Recommended)
+
+Works with both **Docker** and **Podman**.
 
 ```bash
 git clone --recurse-submodules git@github.com:kbjohnson-penn/observer.git
@@ -13,13 +15,17 @@ cd observer
 # Copy observer_backend/.env.docker to observer_backend/.env
 cp observer_backend/.env.docker observer_backend/.env
 
-# Start all services
-docker-compose up --build
+# Start all services (auto-detects docker or podman)
+./scripts/container_control.sh start
+
+# Or specify the runtime explicitly
+./scripts/container_control.sh start docker
+./scripts/container_control.sh start podman
 ```
 
 ### Local Development
 
-#### ⚠️ CRITICAL: Domain Configuration
+#### CRITICAL: Domain Configuration
 
 **Authentication requires consistent domain usage between frontend and backend.**
 
@@ -42,11 +48,11 @@ PROJECT_DIR="/path/to/Workspace/projects/observer/observer_backend/"
 
 Copy and verify `observer_frontend/.env.local`:
 ```bash
-# ✅ CORRECT - use localhost consistently
+# CORRECT - use localhost consistently
 NEXT_PUBLIC_BACKEND_API=http://localhost:8000/api/v1
 INTERNAL_BACKEND_API=http://localhost:8000/api/v1
 
-# ❌ WRONG - will break authentication
+# WRONG - will break authentication
 # NEXT_PUBLIC_BACKEND_API=http://127.0.0.1:8000/api/v1
 ```
 
@@ -54,10 +60,10 @@ INTERNAL_BACKEND_API=http://localhost:8000/api/v1
 
 ```bash
 # Set up databases
-./scripts/clean_db.sh
+./scripts/db_control.sh clean
 
 # Import SQL data (optional - if you have data dumps)
-./scripts/import_data.sh
+./scripts/db_control.sh import
 
 # Run backend locally
 cd observer_backend
@@ -66,7 +72,7 @@ python manage.py runserver 0.0.0.0:8000
 
 # Run frontend locally
 cd observer_frontend
-npm install --legacy-peer-deps
+npm install
 npm run dev
 ```
 
@@ -84,7 +90,7 @@ If login redirects to login page (redirect loop):
 3. **Verify backend CORS settings** include `http://localhost:3000`
 4. **Check browser Network tab** for `Set-Cookie` headers in login response
 
-**Note for development:** While Docker is excellent for production deployments, consider using local development (npm run dev) instead of Docker during development on Mac and Windows for better performance.
+**Note for development:** While containers are excellent for production deployments, consider using local development (npm run dev) instead during development on Mac and Windows for better performance.
 
 ## Architecture
 
@@ -92,16 +98,16 @@ If login redirects to login page (redirect loop):
 - **Backend**: Django 5.0.1 + DRF + JWT Auth (see `observer_backend/README.md`)
 - **Database**: Multi-database MariaDB setup (accounts, clinical, research)
 - **Storage**: Azure Storage
-- **Containerization**: Docker Compose with volume mounts for development
+- **Containerization**: Docker/Podman with Compose
 
 ## Prerequisites
 
-- Docker & Docker Compose
+- Docker or Podman (with Compose)
 - For local development: Python 3.10+, Node.js 18+, MariaDB
 
-## Docker Configuration
+## Container Configuration
 
-The Docker setup uses a single `docker-compose.yml` with three MariaDB containers:
+The setup uses a single `docker-compose.yml` (compatible with both Docker and Podman) with three MariaDB containers:
 
 - **accounts_db**: Port 3306 → `observer_accounts` database
 - **clinical_db**: Port 3307 → `observer_clinical` database  
@@ -109,35 +115,47 @@ The Docker setup uses a single `docker-compose.yml` with three MariaDB container
 
 Environment variables are configured in `observer_backend/.env`.
 
-## Docker Commands
+## Container Commands
+
+Use `./scripts/container_control.sh` to manage the environment. It auto-detects your runtime, or you can specify it explicitly.
 
 ```bash
 # Start all services
-docker-compose up --build
-
-# Start in background
-docker-compose up -d --build
+./scripts/container_control.sh start
+./scripts/container_control.sh start docker    # force docker
+./scripts/container_control.sh start podman    # force podman
 
 # Stop services
-docker-compose down
+./scripts/container_control.sh stop
 
-# Clean everything (containers, volumes)
-docker-compose down -v --remove-orphans
+# Rebuild images
+./scripts/container_control.sh rebuild
 
-# View logs
-docker-compose logs -f
-docker-compose logs -f backend
+# Restart (stop + rebuild + start)
+./scripts/container_control.sh restart
 
-# Access containers
-docker-compose exec backend bash
-docker-compose exec accounts_db mysql -u observer -pobserver_password observer_accounts
+# Clean everything (containers, volumes, images)
+./scripts/container_control.sh clean
+
+# Run migrations and generate mock data
+./scripts/container_control.sh mockdata
 ```
 
 ### Manual Operations
 
+Replace `docker` with `podman` if using Podman.
+
 ```bash
+# View logs
+docker compose logs -f
+docker compose logs -f backend
+
+# Access containers
+docker compose exec backend bash
+docker compose exec accounts_db mysql -u observer -pobserver_password observer_accounts
+
 # Create admin user
-docker-compose exec backend python manage.py createsuperuser --database=accounts
+docker compose exec backend python manage.py createsuperuser --database=accounts
 ```
 
 ## Development Workflow
