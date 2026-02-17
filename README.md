@@ -9,7 +9,7 @@ Healthcare platform for collecting, analyzing, and visualizing medical encounter
 Works with both **Docker** and **Podman**.
 
 ```bash
-git clone --recurse-submodules git@github.com:kbjohnson-penn/observer.git
+git clone --recurse-submodules https://github.com/kbjohnson-penn/observer.git
 cd observer
 
 # Copy observer_backend/.env.docker to observer_backend/.env
