@@ -1,0 +1,29 @@
+# E2E overlay — extends base docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
+#
+# Changes from base:
+# - Backend uses e2e settings (rate limiting off, long JWT, test emails)
+# - Backend seeds E2E test data after migrations
+# - Backend has a healthcheck endpoint
+
+services:
+  backend:
+    environment:
+      DJANGO_SETTINGS_MODULE: backend.settings.e2e
+    command: >
+      sh -c "
+        /wait-for-it.sh accounts_db:3306 --
+        /wait-for-it.sh clinical_db:3306 --
+        /wait-for-it.sh research_db:3306 --
+        python manage.py migrate --database=accounts &&
+        python manage.py migrate --database=clinical &&
+        python manage.py migrate --database=research &&
+        python manage.py seed_e2e_data &&
+        python manage.py runserver 0.0.0.0:8000
+      "
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s

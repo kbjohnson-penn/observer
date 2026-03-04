@@ -1,0 +1,165 @@
+name: E2E & Integration Tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
+
+jobs:
+  # Integration tests — frontend only, mocked backend, fast (~2 min)
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout monorepo with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install frontend dependencies
+        working-directory: observer_frontend
+        run: npm ci --legacy-peer-deps
+
+      - name: Build frontend
+        working-directory: observer_frontend
+        env:
+          NEXT_PUBLIC_BACKEND_API: http://localhost:8000/api/v1
+        run: npm run build
+
+      - name: Start frontend
+        working-directory: observer_frontend
+        env:
+          NEXT_PUBLIC_BACKEND_API: http://localhost:8000/api/v1
+        run: |
+          npm run start &
+          timeout 60 sh -c 'until curl -sf http://localhost:3000/; do sleep 2; done'
+
+      - name: Install Playwright dependencies
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run integration tests
+        working-directory: e2e
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          CI: "true"
+        run: npx playwright test --project=integration
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-report
+          path: e2e/playwright-report/
+          retention-days: 14
+
+      - name: Upload test results on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: integration-test-results
+          path: e2e/test-results/
+          retention-days: 7
+
+  # E2E tests — full stack with Docker backend + real DBs (~5-8 min)
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout monorepo with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Create backend .env for E2E
+        run: |
+          cat > observer_backend/.env << 'EOF'
+          SECRET_KEY=e2e-secret-key-not-for-production-use-only
+          DJANGO_SETTINGS_MODULE=backend.settings.e2e
+          DEBUG=True
+          DB_USER=observer
+          DB_PASSWORD=observer_password
+          DB_HOST=localhost
+          DB_PORT=3306
+          ACCOUNTS_DB_HOST=localhost
+          ACCOUNTS_DB_PORT=3306
+          CLINICAL_DB_HOST=localhost
+          CLINICAL_DB_PORT=3307
+          RESEARCH_DB_HOST=localhost
+          RESEARCH_DB_PORT=3308
+          AZURE_STORAGE_ACCOUNT_NAME=test_account
+          AZURE_STORAGE_FILE_SYSTEM_NAME=test_fs
+          AZURE_SAS_TOKEN=test_token
+          EOF
+
+      - name: Start backend and databases
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
+
+      - name: Wait for backend to be healthy
+        run: |
+          timeout 120 sh -c 'until curl -sf http://localhost:8000/api/v1/health/; do sleep 3; done'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install frontend dependencies
+        working-directory: observer_frontend
+        run: npm ci --legacy-peer-deps
+
+      - name: Build and start frontend
+        working-directory: observer_frontend
+        env:
+          NEXT_PUBLIC_BACKEND_API: http://localhost:8000/api/v1
+        run: |
+          npm run build
+          npm run start &
+          timeout 60 sh -c 'until curl -sf http://localhost:3000/; do sleep 2; done'
+
+      - name: Install Playwright dependencies
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        working-directory: e2e
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          BACKEND_API_URL: http://localhost:8000/api/v1
+          TEST_PROJECT: e2e
+          CI: "true"
+        run: npx playwright test --project=e2e
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-report
+          path: e2e/playwright-report/
+          retention-days: 14
+
+      - name: Upload test results on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-test-results
+          path: e2e/test-results/
+          retention-days: 7
+
+      - name: Stop Docker services
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml down -v
