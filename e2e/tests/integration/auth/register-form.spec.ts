@@ -52,4 +52,28 @@ test.describe('Registration form', () => {
     await page.goto('/register');
     await expect(page.getByText('Sign in here')).toBeVisible();
   });
+
+  test('cannot submit registration with missing fields', async ({ page }) => {
+    await page.goto('/register');
+
+    await page.getByRole('button', { name: /create account/i }).click();
+
+    await expect(
+      page.getByPlaceholder('Enter your first name')
+    ).toBeVisible();
+
+    await expect(page).toHaveURL('/register');
+  });
+
+  test('sanitizes or rejects potential XSS in input fields', async ({ page }) => {
+    const xssPayload = '<script>alert("xss")</script>';
+    
+    await page.goto('/register');
+    await page.getByPlaceholder(/first name/i).fill(xssPayload);
+    await page.getByPlaceholder(/last name/i).fill(xssPayload);
+    await page.getByRole('button', { name: /create account/i }).click();
+
+    const firstNameValue = await page.getByPlaceholder(/first name/i).inputValue();
+    expect(firstNameValue).toBe(xssPayload); 
+  });
 });

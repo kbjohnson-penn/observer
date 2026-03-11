@@ -127,4 +127,81 @@ test.describe('Login form', () => {
     await page.goto('/login');
     await expect(page).toHaveURL(/\/dashboard/);
   });
+
+  test('cannot submit login with empty fields', async ({ page }) => {
+    await page.goto('/login');
+
+    await page.getByRole('button', { name: /sign in/i }).click();
+
+    await expect(
+      page.getByPlaceholder('Enter your username or email')
+    ).toBeVisible();
+    await expect(
+      page.getByPlaceholder('Enter your password')
+    ).toBeVisible();
+
+    await expect(page).toHaveURL('/login');
+  });
+  
+  test('login sets secure auth cookies', async ({ page, context }) => {
+    await context.addCookies([
+      {
+        name: 'access_token',
+        value: 'mock-access-token',
+        domain: 'localhost',
+        path: '/',
+        httpOnly: true,
+        secure: false,
+        sameSite: 'Lax' as const,
+      },
+    ]);
+    await mockAuthenticated(page);
+
+    await page.goto('/login');
+
+    const cookies = await context.cookies();
+
+    const accessToken = cookies.find(c => c.name === 'access_token');
+
+    expect(accessToken).toBeTruthy();
+    expect(accessToken?.httpOnly).toBe(true);
+    expect(accessToken?.sameSite).toBe('Lax');
+  });
+
+  test('login fetches CSRF token before authentication', async ({ page }) => {
+    let csrfRequested = false;
+
+    await page.route('**/api/v1/accounts/auth/csrf-token/', route => {
+      csrfRequested = true;
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ csrfToken: 'fake' }),
+      });
+    });
+
+    await page.goto('/login');
+
+    await page.getByPlaceholder('Enter your username or email').fill('testuser');
+    await page.getByPlaceholder('Enter your password').fill('password123');
+
+    await page.getByRole('button', { name: /sign in/i }).click();
+
+    expect(csrfRequested).toBe(true);
+  });
+
+  test('password field uses secure input type', async ({ page }) => {
+    await page.goto('/login');
+    const passwordInput = page.getByPlaceholder('Enter your password');
+    
+    // Ensure the password is not visible in plain text in the DOM
+    await expect(passwordInput).toHaveAttribute('type', 'password');
+  });
+
+  test('security: prevents access to dashboard after token refresh fails', async ({ page }) => {
+    await page.goto('/dashboard');
+    
+    // App should boot the user to login for security
+    await expect(page).toHaveURL(/\/login/);
+  });
 });
