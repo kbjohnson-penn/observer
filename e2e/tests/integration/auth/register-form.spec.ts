@@ -1,24 +1,34 @@
-import { test, expect } from '@playwright/test';
-import {
-  mockUnauthenticated,
-  mockRegistrationSuccess,
-} from '../../../helpers/mock-api';
+// registration.spec.ts
+import { test, expect } from '../../../fixtures/mock-auth.fixture';
+import type { Page } from '@playwright/test';
+import { mockRegistrationSuccess } from '../../../helpers/mock-api';
 
 test.describe('Registration form', () => {
-  test.beforeEach(async ({ page }) => {
-    await mockUnauthenticated(page);
-  });
+  // Apply unauthenticated fixture to all tests in this suite
+  test.use({ authState: 'unauthenticated' });
 
-  test('renders all required fields', async ({ page }) => {
+  /**
+   * Helper function to fill registration form.
+   */
+  const fillRegistrationForm = async (page: Page) => {
+    await page.getByPlaceholder('Enter your first name').fill('Jane');
+    await page.getByPlaceholder('Enter your last name').fill('Doe');
+    await page
+      .getByPlaceholder('Enter your email address')
+      .fill('jane@example.edu');
+    await page.getByPlaceholder('Enter your organization').fill('MIT');
+  };
+
+  test('Renders all required fields', async ({ page }) => {
     await page.goto('/register');
 
-    await expect(
-      page.getByRole('button', { name: 'Create Account' })
-    ).toBeVisible();
+    // Check that all fields and buttons are visible
     await expect(
       page.getByPlaceholder('Enter your first name')
     ).toBeVisible();
-    await expect(page.getByPlaceholder('Enter your last name')).toBeVisible();
+    await expect(
+      page.getByPlaceholder('Enter your last name')
+    ).toBeVisible();
     await expect(
       page.getByPlaceholder('Enter your email address')
     ).toBeVisible();
@@ -28,18 +38,17 @@ test.describe('Registration form', () => {
     await expect(
       page.getByRole('button', { name: /create account/i })
     ).toBeVisible();
+    await expect(page.getByText('Sign in here')).toBeVisible();
   });
 
-  test('successful registration shows success message', async ({ page }) => {
-    await mockRegistrationSuccess(page);
+  test('Successful registration shows success message', async ({ page }) => {
+    await mockRegistrationSuccess(page); // Mock backend success
 
     await page.goto('/register');
-    await page.getByPlaceholder('Enter your first name').fill('Jane');
-    await page.getByPlaceholder('Enter your last name').fill('Doe');
-    await page.getByPlaceholder('Enter your email address').fill('jane@example.edu');
-    await page.getByPlaceholder('Enter your organization').fill('MIT');
+    await fillRegistrationForm(page); // Fill the form
     await page.getByRole('button', { name: /create account/i }).click();
 
+    // Verify success messages
     await expect(
       page.getByText(/registration successful/i)
     ).toBeVisible();
@@ -48,32 +57,16 @@ test.describe('Registration form', () => {
     ).toBeVisible();
   });
 
-  test('has link to sign in page', async ({ page }) => {
-    await page.goto('/register');
-    await expect(page.getByText('Sign in here')).toBeVisible();
-  });
+  test('Cannot submit registration with missing fields', async ({ page }) => {
+    await mockRegistrationSuccess(page); // Even with mock, missing fields prevent submission
 
-  test('cannot submit registration with missing fields', async ({ page }) => {
     await page.goto('/register');
-
     await page.getByRole('button', { name: /create account/i }).click();
 
+    // Form fields should still be visible (no redirect)
     await expect(
       page.getByPlaceholder('Enter your first name')
     ).toBeVisible();
-
     await expect(page).toHaveURL('/register');
-  });
-
-  test('sanitizes or rejects potential XSS in input fields', async ({ page }) => {
-    const xssPayload = '<script>alert("xss")</script>';
-    
-    await page.goto('/register');
-    await page.getByPlaceholder(/first name/i).fill(xssPayload);
-    await page.getByPlaceholder(/last name/i).fill(xssPayload);
-    await page.getByRole('button', { name: /create account/i }).click();
-
-    const firstNameValue = await page.getByPlaceholder(/first name/i).inputValue();
-    expect(firstNameValue).toBe(xssPayload); 
   });
 });

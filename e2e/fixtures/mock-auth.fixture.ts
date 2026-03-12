@@ -1,50 +1,48 @@
-/**
- * Integration test fixtures — mock backend API for authenticated state.
- * Use these in tests under tests/integration/ where no backend is running.
- */
-import { test as base, type Page } from '@playwright/test';
+import { test as base } from '@playwright/test';
 import {
   mockAuthenticated,
   mockUnauthenticated,
-  DEFAULT_PROFILE,
+  mockLoginSuccess,
+  mockLoginFailure,
 } from '../helpers/mock-api';
 
-type MockAuthFixtures = {
-  /** A page with mocked authenticated state (token refresh succeeds) */
-  authenticatedPage: Page;
-  /** A page with mocked unauthenticated state (token refresh fails) */
-  unauthenticatedPage: Page;
+type AuthState =
+  | 'authenticated'
+  | 'unauthenticated'
+  | 'login-success'
+  | 'login-failure'
+  | 'none';
+
+type AuthFixtures = {
+  authState: AuthState;
 };
 
-export const test = base.extend<MockAuthFixtures>({
-  authenticatedPage: async ({ page, context }, use) => {
-    // Set access_token cookie so Next.js middleware allows protected routes
-    await context.addCookies([
-      {
-        name: 'access_token',
-        value: 'mock-access-token',
-        domain: 'localhost',
-        path: '/',
-        httpOnly: true,
-        secure: false,
-        sameSite: 'Lax',
-      },
-      {
-        name: 'refresh_token',
-        value: 'mock-refresh-token',
-        domain: 'localhost',
-        path: '/',
-        httpOnly: true,
-        secure: false,
-        sameSite: 'Lax',
-      },
-    ]);
-    await mockAuthenticated(page, DEFAULT_PROFILE);
-    await use(page);
-  },
+export const test = base.extend<AuthFixtures>({
+  authState: ['none', { option: true }],
 
-  unauthenticatedPage: async ({ page }, use) => {
-    await mockUnauthenticated(page);
+  page: async ({ page, authState }, use) => {
+    switch (authState) {
+      case 'authenticated':
+        await mockAuthenticated(page);
+        break;
+
+      case 'unauthenticated':
+        await mockUnauthenticated(page);
+        break;
+
+      case 'login-success':
+        await mockLoginSuccess(page);
+        break;
+
+      case 'login-failure':
+        await mockLoginFailure(page);
+        break;
+
+      case 'none':
+      default:
+        break;
+    }
+
     await use(page);
   },
 });
