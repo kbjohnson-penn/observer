@@ -3,12 +3,13 @@
 # Observer Database Control Script
 # Manages database operations inside Docker/Podman containers
 #
-# Usage: ./scripts/db_control.sh <action> [runtime]
+# Usage: ./scripts/db_control.sh <action> [--db=<db>] [--table=<table>] [runtime]
 #
 # Actions:
 #   clean   - Reset all databases, recreate user, run migrations
-#   import  - Import SQL dumps into clinical and research databases
-#   reset   - Clean + import in sequence
+#   import  - Import SQL dumps into clinical and/or research databases
+#   reset   - Clean + import + sync Elasticsearch in sequence
+#   es-sync - Sync (or re-index) Elasticsearch from current database state
 
 set -e
 
@@ -26,23 +27,62 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
 # ============================================================================
+# ARG PARSING — strip --db= and --table= flags before runtime detection
+# ============================================================================
+
+TARGET_DB=""
+TARGET_TABLE=""
+CLEANED_ARGS=()
+
+for arg in "${@:2}"; do
+    case "$arg" in
+        --db=*)
+            TARGET_DB="${arg#--db=}"
+            ;;
+        --table=*)
+            TARGET_TABLE="${arg#--table=}"
+            ;;
+        *)
+            CLEANED_ARGS+=("$arg")
+            ;;
+    esac
+done
+
+# Validate --db value if supplied
+if [[ -n "$TARGET_DB" && "$TARGET_DB" != "clinical" && "$TARGET_DB" != "research" && "$TARGET_DB" != "accounts" ]]; then
+    echo -e "${RED}Unknown database: '$TARGET_DB'. Valid values: accounts, clinical, research${NC}"
+    exit 1
+fi
+
+# ============================================================================
 # USAGE
 # ============================================================================
 
 show_usage() {
-    echo "Usage: $0 <action> [runtime]"
+    echo "Usage: $0 <action> [--db=<db>] [--table=<table>] [runtime]"
     echo ""
     echo "Actions:"
-    echo "  clean   : Reset all databases, recreate user, run migrations"
-    echo "  import  : Import SQL dumps into clinical and research databases"
-    echo "  reset   : Clean + import in sequence"
+    echo "  clean    : Reset all databases, recreate user, run migrations"
+    echo "  import   : Import SQL dumps into clinical and/or research databases"
+    echo "  reset    : Clean + import + sync Elasticsearch in sequence"
+    echo "  es-sync  : Sync (or re-index) Elasticsearch from current database state"
+    echo ""
+    echo "Flags (clean and import actions):"
+    echo "  --db=<db>        : Limit to one database: accounts | clinical | research"
+    echo "  --table=<table>  : (import only) Import a single table (auto-detects DB if --db omitted)"
     echo ""
     echo "Runtime (optional): docker | podman  (auto-detected if omitted)"
     echo ""
     echo "Examples:"
-    echo "  $0 clean"
+    echo "  $0 clean                               # reset all three databases"
+    echo "  $0 clean --db=research                 # reset only the research database"
+    echo "  $0 import                              # all tables in both DBs"
+    echo "  $0 import --db=research                # all research tables only"
+    echo "  $0 import --table=visit_occurrence     # one table (DB auto-detected)"
+    echo "  $0 import --db=research --table=note   # explicit DB + table"
     echo "  $0 import podman"
     echo "  $0 reset docker"
+    echo "  $0 es-sync"
     exit 1
 }
 
@@ -50,17 +90,17 @@ show_usage() {
 # RUNTIME DETECTION
 # ============================================================================
 
-if [[ -n "$2" ]]; then
-    case "$2" in
+if [[ -n "${CLEANED_ARGS[0]}" ]]; then
+    case "${CLEANED_ARGS[0]}" in
         docker|podman)
-            CONTAINER_RUNTIME="$2"
+            CONTAINER_RUNTIME="${CLEANED_ARGS[0]}"
             if ! command -v "$CONTAINER_RUNTIME" &> /dev/null; then
                 echo -e "${RED}$CONTAINER_RUNTIME is not installed. Please install it and try again.${NC}"
                 exit 1
             fi
             ;;
         *)
-            echo "Unknown runtime: $2. Use 'docker' or 'podman'."
+            echo "Unknown runtime: ${CLEANED_ARGS[0]}. Use 'docker' or 'podman'."
             show_usage
             ;;
     esac
@@ -148,15 +188,36 @@ run_sql() {
 # ============================================================================
 
 clean_db() {
-    check_containers "$ACCOUNTS_CONTAINER" "$CLINICAL_CONTAINER" "$RESEARCH_CONTAINER"
+    # Determine which DBs to clean (default: all three)
+    local do_accounts=1 do_clinical=1 do_research=1
+    if [[ -n "$TARGET_DB" ]]; then
+        do_accounts=0 do_clinical=0 do_research=0
+        case "$TARGET_DB" in
+            accounts)  do_accounts=1 ;;
+            clinical)  do_clinical=1 ;;
+            research)  do_research=1 ;;
+        esac
+    fi
 
-    echo -e "${GREEN}Starting Observer Database Reset...${NC}"
+    # Check only the containers we need
+    local containers_to_check=()
+    [[ $do_accounts -eq 1 ]] && containers_to_check+=("$ACCOUNTS_CONTAINER")
+    [[ $do_clinical -eq 1 ]] && containers_to_check+=("$CLINICAL_CONTAINER")
+    [[ $do_research -eq 1 ]] && containers_to_check+=("$RESEARCH_CONTAINER")
+    check_containers "${containers_to_check[@]}"
 
-    # Step 1: Reset databases and user in each container
+    if [[ -n "$TARGET_DB" ]]; then
+        echo -e "${GREEN}Starting reset of '$TARGET_DB' database...${NC}"
+    else
+        echo -e "${GREEN}Starting Observer Database Reset...${NC}"
+    fi
+
+    # Step 1: Reset selected database(s) and user
     echo -e "${YELLOW}Step 1: Resetting databases and user...${NC}"
 
-    echo "Resetting $ACCOUNTS_DB..."
-    run_sql "$ACCOUNTS_CONTAINER" "
+    if [[ $do_accounts -eq 1 ]]; then
+        echo "Resetting $ACCOUNTS_DB..."
+        run_sql "$ACCOUNTS_CONTAINER" "
 DROP DATABASE IF EXISTS $ACCOUNTS_DB;
 CREATE DATABASE $ACCOUNTS_DB;
 DROP USER IF EXISTS '$DB_USER'@'%';
@@ -166,9 +227,11 @@ GRANT CREATE ON *.* TO '$DB_USER'@'%';
 GRANT DROP ON *.* TO '$DB_USER'@'%';
 FLUSH PRIVILEGES;
 "
+    fi
 
-    echo "Resetting $CLINICAL_DB..."
-    run_sql "$CLINICAL_CONTAINER" "
+    if [[ $do_clinical -eq 1 ]]; then
+        echo "Resetting $CLINICAL_DB..."
+        run_sql "$CLINICAL_CONTAINER" "
 DROP DATABASE IF EXISTS $CLINICAL_DB;
 CREATE DATABASE $CLINICAL_DB;
 DROP USER IF EXISTS '$DB_USER'@'%';
@@ -178,9 +241,11 @@ GRANT CREATE ON *.* TO '$DB_USER'@'%';
 GRANT DROP ON *.* TO '$DB_USER'@'%';
 FLUSH PRIVILEGES;
 "
+    fi
 
-    echo "Resetting $RESEARCH_DB..."
-    run_sql "$RESEARCH_CONTAINER" "
+    if [[ $do_research -eq 1 ]]; then
+        echo "Resetting $RESEARCH_DB..."
+        run_sql "$RESEARCH_CONTAINER" "
 DROP DATABASE IF EXISTS $RESEARCH_DB;
 CREATE DATABASE $RESEARCH_DB;
 DROP USER IF EXISTS '$DB_USER'@'%';
@@ -190,50 +255,64 @@ GRANT CREATE ON *.* TO '$DB_USER'@'%';
 GRANT DROP ON *.* TO '$DB_USER'@'%';
 FLUSH PRIVILEGES;
 "
+    fi
 
     echo -e "${GREEN}Databases and user reset successfully${NC}"
 
-    # Step 2: Create fresh migrations
+    # Step 2: Create fresh migrations for selected app(s)
     echo -e "${YELLOW}Step 2: Creating fresh migrations...${NC}"
 
-    echo "Creating migrations for accounts app..."
-    $COMPOSE_CMD exec backend python manage.py makemigrations accounts
-
-    echo "Creating migrations for clinical app..."
-    $COMPOSE_CMD exec backend python manage.py makemigrations clinical
-
-    echo "Creating migrations for research app..."
-    $COMPOSE_CMD exec backend python manage.py makemigrations research
+    if [[ $do_accounts -eq 1 ]]; then
+        echo "Creating migrations for accounts app..."
+        $COMPOSE_CMD exec backend python manage.py makemigrations accounts
+    fi
+    if [[ $do_clinical -eq 1 ]]; then
+        echo "Creating migrations for clinical app..."
+        $COMPOSE_CMD exec backend python manage.py makemigrations clinical
+    fi
+    if [[ $do_research -eq 1 ]]; then
+        echo "Creating migrations for research app..."
+        $COMPOSE_CMD exec backend python manage.py makemigrations research
+    fi
 
     echo -e "${GREEN}Fresh migrations created${NC}"
 
-    # Step 3: Apply migrations to correct databases
+    # Step 3: Apply migrations to selected database(s)
     echo -e "${YELLOW}Step 3: Applying migrations...${NC}"
 
-    echo "Migrating accounts app to accounts database..."
-    $COMPOSE_CMD exec backend python manage.py migrate --database=accounts
-
-    echo "Migrating clinical app to clinical database..."
-    $COMPOSE_CMD exec backend python manage.py migrate --database=clinical
-
-    echo "Migrating research app to research database..."
-    $COMPOSE_CMD exec backend python manage.py migrate --database=research
+    if [[ $do_accounts -eq 1 ]]; then
+        echo "Migrating accounts app to accounts database..."
+        $COMPOSE_CMD exec backend python manage.py migrate --database=accounts
+    fi
+    if [[ $do_clinical -eq 1 ]]; then
+        echo "Migrating clinical app to clinical database..."
+        $COMPOSE_CMD exec backend python manage.py migrate --database=clinical
+    fi
+    if [[ $do_research -eq 1 ]]; then
+        echo "Migrating research app to research database..."
+        $COMPOSE_CMD exec backend python manage.py migrate --database=research
+    fi
 
     echo -e "${GREEN}All migrations applied successfully${NC}"
 
-    # Step 4: Verify everything worked
+    # Step 4: Verify selected databases
     echo -e "${YELLOW}Step 4: Verifying database setup...${NC}"
 
-    echo "Checking $ACCOUNTS_DB tables:"
-    $CONTAINER_RUNTIME exec "$ACCOUNTS_CONTAINER" mariadb -u "$DB_USER" -p"$DB_PASSWORD" -e "USE $ACCOUNTS_DB; SHOW TABLES;"
-
-    echo ""
-    echo "Checking $CLINICAL_DB tables:"
-    $CONTAINER_RUNTIME exec "$CLINICAL_CONTAINER" mariadb -u "$DB_USER" -p"$DB_PASSWORD" -e "USE $CLINICAL_DB; SHOW TABLES;"
-
-    echo ""
-    echo "Checking $RESEARCH_DB tables:"
-    $CONTAINER_RUNTIME exec "$RESEARCH_CONTAINER" mariadb -u "$DB_USER" -p"$DB_PASSWORD" -e "USE $RESEARCH_DB; SHOW TABLES;"
+    if [[ $do_accounts -eq 1 ]]; then
+        echo "Checking $ACCOUNTS_DB tables:"
+        $CONTAINER_RUNTIME exec "$ACCOUNTS_CONTAINER" mariadb -u "$DB_USER" -p"$DB_PASSWORD" -e "USE $ACCOUNTS_DB; SHOW TABLES;"
+        echo ""
+    fi
+    if [[ $do_clinical -eq 1 ]]; then
+        echo "Checking $CLINICAL_DB tables:"
+        $CONTAINER_RUNTIME exec "$CLINICAL_CONTAINER" mariadb -u "$DB_USER" -p"$DB_PASSWORD" -e "USE $CLINICAL_DB; SHOW TABLES;"
+        echo ""
+    fi
+    if [[ $do_research -eq 1 ]]; then
+        echo "Checking $RESEARCH_DB tables:"
+        $CONTAINER_RUNTIME exec "$RESEARCH_CONTAINER" mariadb -u "$DB_USER" -p"$DB_PASSWORD" -e "USE $RESEARCH_DB; SHOW TABLES;"
+        echo ""
+    fi
 
     echo -e "${GREEN}Database reset completed successfully!${NC}"
 }
@@ -295,29 +374,113 @@ import_files() {
 }
 
 import_data() {
-    check_containers "$CLINICAL_CONTAINER" "$RESEARCH_CONTAINER"
+    # Resolve which DB(s) and table(s) to import
+    # If TARGET_TABLE is set and TARGET_DB is not, auto-detect DB from the known arrays
+    if [[ -n "$TARGET_TABLE" && -z "$TARGET_DB" ]]; then
+        local in_clinical=0 in_research=0
+        for f in "${CLINICAL_FILES[@]}"; do [[ "$f" == "$TARGET_TABLE" ]] && in_clinical=1; done
+        for f in "${RESEARCH_FILES[@]}"; do [[ "$f" == "$TARGET_TABLE" ]] && in_research=1; done
 
-    echo -e "${GREEN}Importing SQL dumps to Observer databases...${NC}"
+        if [[ $in_clinical -eq 1 && $in_research -eq 1 ]]; then
+            echo -e "${RED}Table '$TARGET_TABLE' exists in both databases. Use --db= to specify which one.${NC}"
+            exit 1
+        elif [[ $in_clinical -eq 1 ]]; then
+            TARGET_DB="clinical"
+        elif [[ $in_research -eq 1 ]]; then
+            TARGET_DB="research"
+        else
+            echo -e "${RED}Table '$TARGET_TABLE' not found in any database.${NC}"
+            echo "Clinical tables: ${CLINICAL_FILES[*]}"
+            echo "Research tables: ${RESEARCH_FILES[*]}"
+            exit 1
+        fi
+    fi
 
-    echo -e "${YELLOW}Importing Clinical database...${NC}"
-    import_files "$CLINICAL_CONTAINER" "$CLINICAL_DB" "$CLINICAL_DUMP_DIR" "${CLINICAL_FILES[@]}"
-    echo ""
+    # If TARGET_TABLE + TARGET_DB are both set, validate the table belongs to that DB
+    if [[ -n "$TARGET_TABLE" && -n "$TARGET_DB" ]]; then
+        local found=0
+        if [[ "$TARGET_DB" == "clinical" ]]; then
+            for f in "${CLINICAL_FILES[@]}"; do [[ "$f" == "$TARGET_TABLE" ]] && found=1; done
+        else
+            for f in "${RESEARCH_FILES[@]}"; do [[ "$f" == "$TARGET_TABLE" ]] && found=1; done
+        fi
+        if [[ $found -eq 0 ]]; then
+            echo -e "${RED}Table '$TARGET_TABLE' not found in the '$TARGET_DB' database.${NC}"
+            if [[ "$TARGET_DB" == "clinical" ]]; then
+                echo "Clinical tables: ${CLINICAL_FILES[*]}"
+            else
+                echo "Research tables: ${RESEARCH_FILES[*]}"
+            fi
+            exit 1
+        fi
+    fi
 
-    echo -e "${YELLOW}Importing Research database...${NC}"
-    import_files "$RESEARCH_CONTAINER" "$RESEARCH_DB" "$RESEARCH_DUMP_DIR" "${RESEARCH_FILES[@]}"
+    # Determine which containers we need
+    local need_clinical=0 need_research=0
+    if [[ -z "$TARGET_DB" || "$TARGET_DB" == "clinical" ]]; then need_clinical=1; fi
+    if [[ -z "$TARGET_DB" || "$TARGET_DB" == "research" ]]; then need_research=1; fi
 
-    echo ""
+    # Check only the containers we actually need
+    local containers_to_check=()
+    [[ $need_clinical -eq 1 ]] && containers_to_check+=("$CLINICAL_CONTAINER")
+    [[ $need_research -eq 1 ]] && containers_to_check+=("$RESEARCH_CONTAINER")
+    check_containers "${containers_to_check[@]}"
+
+    # Summary line
+    if [[ -n "$TARGET_TABLE" ]]; then
+        echo -e "${GREEN}Importing table '$TARGET_TABLE' into $TARGET_DB database...${NC}"
+    elif [[ -n "$TARGET_DB" ]]; then
+        echo -e "${GREEN}Importing all tables into $TARGET_DB database...${NC}"
+    else
+        echo -e "${GREEN}Importing SQL dumps to Observer databases...${NC}"
+    fi
+
+    if [[ $need_clinical -eq 1 ]]; then
+        echo -e "${YELLOW}Importing Clinical database...${NC}"
+        if [[ -n "$TARGET_TABLE" ]]; then
+            import_files "$CLINICAL_CONTAINER" "$CLINICAL_DB" "$CLINICAL_DUMP_DIR" "$TARGET_TABLE"
+        else
+            import_files "$CLINICAL_CONTAINER" "$CLINICAL_DB" "$CLINICAL_DUMP_DIR" "${CLINICAL_FILES[@]}"
+        fi
+        echo ""
+    fi
+
+    if [[ $need_research -eq 1 ]]; then
+        echo -e "${YELLOW}Importing Research database...${NC}"
+        if [[ -n "$TARGET_TABLE" ]]; then
+            import_files "$RESEARCH_CONTAINER" "$RESEARCH_DB" "$RESEARCH_DUMP_DIR" "$TARGET_TABLE"
+        else
+            import_files "$RESEARCH_CONTAINER" "$RESEARCH_DB" "$RESEARCH_DUMP_DIR" "${RESEARCH_FILES[@]}"
+        fi
+        echo ""
+    fi
+
     echo -e "${GREEN}All imports completed successfully!${NC}"
 }
 
 # ============================================================================
-# RESET: Clean + Import
+# ES-SYNC: Sync Elasticsearch indexes from current database state
+# ============================================================================
+
+sync_elasticsearch() {
+    echo -e "${YELLOW}Syncing Elasticsearch indexes (full reindex)...${NC}"
+    $COMPOSE_CMD exec backend python manage.py sync_elasticsearch --full-reindex || {
+        echo -e "${RED}Failed to sync Elasticsearch${NC}"
+        exit 1
+    }
+    echo -e "${GREEN}Elasticsearch sync completed successfully!${NC}"
+}
+
+# ============================================================================
+# RESET: Clean + Import + ES Sync
 # ============================================================================
 
 reset_db() {
     clean_db
     echo ""
     import_data
+    echo ""
+    sync_elasticsearch
 }
 
 # ============================================================================
@@ -333,6 +496,9 @@ case "$1" in
         ;;
     reset)
         reset_db
+        ;;
+    es-sync)
+        sync_elasticsearch
         ;;
     *)
         show_usage

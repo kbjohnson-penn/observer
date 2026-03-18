@@ -63,16 +63,24 @@ The backend uses **httpOnly cookie-based JWT authentication** for security:
 
 ### Backend (from `observer_backend/`)
 
+> **Python environment**: Backend uses a conda environment named `observer`.
+> All backend commands must be prefixed with `~/miniconda3/bin/conda run -n observer`
+> or run inside an activated shell (`conda activate observer`).
+
 ```bash
-make install-dev    # Install dependencies
-make run            # Run dev server
-make test           # Run tests with coverage
-make lint           # Run all linters
-make format         # Format code (Black + isort)
-make migrate        # Run migrations
+~/miniconda3/bin/conda run -n observer make install-dev    # Install dependencies
+~/miniconda3/bin/conda run -n observer make run            # Run dev server
+~/miniconda3/bin/conda run -n observer make test           # Run tests with coverage
+~/miniconda3/bin/conda run -n observer make lint           # Run all linters
+~/miniconda3/bin/conda run -n observer make format         # Format code (Black + isort)
+~/miniconda3/bin/conda run -n observer make migrate        # Run migrations
 ```
 
 ### Frontend (from `observer_frontend/`)
+
+> **Node environment**: Node.js is managed via nvm. Use `~/.nvm/versions/node/v22.20.0/bin/node`
+> and `~/.nvm/versions/node/v22.20.0/bin/npm` when running commands directly (e.g. in Bash tool).
+> Standard `npm run ...` commands work normally from within `observer_frontend/`.
 
 ```bash
 npm install         # Install dependencies

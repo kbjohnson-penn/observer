@@ -6,13 +6,13 @@ clean_env() {
   $COMPOSE_CMD down -v --remove-orphans || { echo "Failed to stop and remove containers"; exit 1; }
 
   echo "Force removing any remaining project volumes..."
-  $CONTAINER_RUNTIME volume rm observer_accounts_data observer_clinical_data observer_research_data 2>/dev/null || echo "All project volumes already removed."
+  $CONTAINER_RUNTIME volume rm observer_accounts_data observer_clinical_data observer_research_data observer_elasticsearch_data 2>/dev/null || echo "All project volumes already removed."
 
   echo "Pruning unused volumes..."
   $CONTAINER_RUNTIME volume prune -f || { echo "Failed to prune volumes"; exit 1; }
 
   echo "Removing project images..."
-  $CONTAINER_RUNTIME rmi observer-backend mariadb:latest 2>/dev/null || echo "Some images were not found or couldn't be removed."
+  $CONTAINER_RUNTIME rmi observer-backend mariadb:latest elasticsearch:8.17.0 2>/dev/null || echo "Some images were not found or couldn't be removed."
 
   echo "Pruning unused images..."
   $CONTAINER_RUNTIME image prune -f || { echo "Failed to prune images"; exit 1; }
@@ -71,8 +71,26 @@ generate_mock_data() {
   # Generate mock data
   echo "Generating mock data..."
   $COMPOSE_CMD exec backend python manage.py generate_mock_data || { echo "Failed to generate mock data"; exit 1; }
-  
+
+  # Sync Elasticsearch indexes
+  echo "Syncing Elasticsearch indexes..."
+  $COMPOSE_CMD exec backend python manage.py sync_elasticsearch --full-reindex || { echo "Failed to sync Elasticsearch"; exit 1; }
+
   echo "Mock data generation completed successfully!"
+}
+
+# Function to start Kibana (dev only)
+start_kibana() {
+  echo "Starting Kibana (dev tool)..."
+  $COMPOSE_CMD --profile dev up -d kibana || { echo "Failed to start Kibana"; exit 1; }
+  echo "Kibana available at http://localhost:5601"
+}
+
+# Function to stop Kibana
+stop_kibana() {
+  echo "Stopping Kibana..."
+  $COMPOSE_CMD --profile dev stop kibana || { echo "Failed to stop Kibana"; exit 1; }
+  echo "Kibana stopped."
 }
 
 # Function to show usage
@@ -85,7 +103,9 @@ show_usage() {
   echo "  rebuild  : Rebuild container images"
   echo "  start    : Start the container environment"
   echo "  restart  : Restart the container environment (stop, rebuild, start)"
-  echo "  mockdata : Run migrations and generate mock data"
+  echo "  mockdata : Run migrations, generate mock data, and sync Elasticsearch"
+  echo "  kibana   : Start Kibana for dev ES inspection (http://localhost:5601)"
+  echo "  kibana-stop : Stop Kibana"
   echo ""
   echo "Runtime (optional): docker | podman  (auto-detected if omitted)"
   echo ""
@@ -168,6 +188,12 @@ case "$1" in
     ;;
   mockdata)
     generate_mock_data
+    ;;
+  kibana)
+    start_kibana
+    ;;
+  kibana-stop)
+    stop_kibana
     ;;
   *)
     show_usage
