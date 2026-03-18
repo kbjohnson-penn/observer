@@ -148,7 +148,7 @@ def load_csv_to_mariadb(base_path, host, user, password, database):
             {
                 "table": "visit_occurrence",
                 "file": "visit_occurrence.csv",
-                "columns": "(id, person_id, provider_id, visit_start_date, visit_start_time, visit_source_value, visit_source_id, tier_level)",
+                "columns": "(id, person_id, provider_id, visit_start_date, visit_start_time, visit_source_value, visit_source_id, tier_level, department)",
             },
             {
                 "table": "note",
@@ -222,7 +222,7 @@ def load_csv_to_mariadb(base_path, host, user, password, database):
 
 
 if __name__ == "__main__":
-    base_path = r"C:\Users\mhill1\Downloads\latest_observer"
+    base_path = r"C:\Users\mhill1\Downloads\latest"
     host = "localhost"
     user = "observer"
     password = "observer_password"
